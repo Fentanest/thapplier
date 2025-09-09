@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Logs - TopHeroesApplier{% endblock %}
+
+{% block content %}
+<h1>Full Container Logs</h1>
+<div id="log-container" class="log-container">
+    <pre id="log-output"></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='logs.js') }}"></script>
+{% endblock %}

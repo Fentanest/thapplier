@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Control Panel - TopHeroesApplier{% endblock %}
+
+{% block content %}
+<h1>TopHeroesApplier Control Panel</h1>
+
+<div class="main-content">
+    <div class="left-panel">
+        <h2>UIDs</h2>
+        <p>Select UIDs to run. You can edit the list below.</p>
+        <div id="uid-list" class="list-box">
+            {% for item in uids_list %}
+            <div class="list-item">
+                <input type="checkbox" id="{{ item.id }}" name="uids" value="{{ item.id }}">
+                <label for="{{ item.id }}">{{ item.uid }}{% if item.comment %} ({{ item.comment }}){% endif %}</label>
+                <button class="delete-btn delete-uid-btn" data-uid="{{ item.uid }}">Delete</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button id="run-selected-btn">Run Selected</button>
+        <button id="force-run-btn">Force Run Selected</button>
+        <button id="select-all-btn">Select All</button>
+        <button id="deselect-all-btn">Deselect All</button>
+
+        <div class="raw-editor">
+            <h3>Edit uids.txt</h3>
+            <textarea id="uids-raw">{{ uids_raw }}</textarea>
+            <button id="save-uids-btn">Save UIDs</button>
+        </div>
+    </div>
+
+    <div class="right-panel">
+        <h2>Coupons</h2>
+        <p>Select coupons to apply.</p>
+        <div id="coupon-list" class="list-box">
+            {% for coupon in coupons_list %}
+            <div class="list-item">
+                <input type="checkbox" id="coupon-{{ loop.index }}" name="coupons" value="{{ coupon }}" checked>
+                <label for="coupon-{{ loop.index }}">{{ coupon }}</label>
+                <button class="delete-btn delete-coupon-btn" data-coupon-name="{{ coupon }}">Delete</button>
+            </div>
+            {% endfor %}
+        </div>
+        <button id="select-all-coupons-btn">Select All</button>
+        <button id="deselect-all-coupons-btn">Deselect All</button>
+
+        <div class="raw-editor">
+            <h3>Edit coupons.txt</h3>
+            <textarea id="coupons-raw">{{ coupons_raw }}</textarea>
+            <button id="save-coupons-btn">Save Coupons</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TopHeroesApplier{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("{{ url_for('static', filename='sw.js') }}")
+                    .then(registration => {
+                        console.log('Service Worker registered with scope:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.error('Service Worker registration failed:', err);
+                    });
+            });
+        }
+    </script>
+</head>
+<body data-selenium-hub-url="{{ selenium_hub_url }}">
+    <div class="container">
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Control Panel</a>
+            <a href="{{ url_for('monitoring') }}" class="{{ 'active' if request.endpoint == 'monitoring' else '' }}">Monitoring</a>
+            <a href="{{ url_for('logs_page') }}" class="{{ 'active' if request.endpoint == 'logs_page' else '' }}">Logs</a>
+            <a href="{{ url_for('full_logs_page') }}" class="{{ 'active' if request.endpoint == 'full_logs_page' else '' }}">Full Logs</a>
+            <a href="{{ selenium_hub_url }}" target="_blank">Selenium Hub</a>
+            <a href="{{ url_for('logout') }}" class="logout-link">Logout</a>
+        </div>
+        {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Monitoring - TopHeroesApplier{% endblock %}
+
+{% block content %}
+<h1>Live Monitoring</h1>
+<div id="monitoring-grid" class="monitoring-grid" data-selenium-hub-url="{{ selenium_hub_url }}">
+    <!-- JS will populate this area -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='monitoring.js') }}"></script>
+{% endblock %}

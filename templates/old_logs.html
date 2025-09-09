@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Logs - TopHeroesApplier{% endblock %}
+
+{% block content %}
+<h1>Log Viewer</h1>
+<div class="log-viewer-container">
+    <div class="log-list-panel">
+        <h2>Process Logs (.log)</h2>
+        <div id="log-files-list" class="log-list">
+            <!-- JS will populate this -->
+        </div>
+        
+        <h2>Coupon Logs (.txt)</h2>
+        <div id="coupon-log-files-list" class="log-list">
+            <!-- JS will populate this -->
+        </div>
+    </div>
+    <div class="log-content-panel">
+        <h2 id="log-filename">Select a log file to view</h2>
+        <pre id="log-content" class="log-box"></pre>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='old_logs.js') }}"></script>
+{% endblock %}
