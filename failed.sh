@@ -1,0 +1,1 @@
+sed -i '/Failed/d' coupon_logs/*.txt
