@@ -311,10 +311,8 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                 x_button = wait_and_find_element(driver, By.XPATH, x_button_xpath, timeout=2, visible=False)
                 if x_button:
                     log("Found 'X' button, attempting to close pop-up.")
-                    if click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button", timeout=3):
-                        time.sleep(1)
-                        log("Pop-up closed. Exiting promo button click loop.")
-                        break # Exit the loop if x_button was successfully clicked
+                    click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button", timeout=3)
+                    time.sleep(1)
                 else:
                     log(f"No 'X' button found after clicking Promo Button {i}.")
             else:
