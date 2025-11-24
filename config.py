@@ -51,8 +51,8 @@ CONFIRM_BUTTON = '//*[@id="__layout"]//button[normalize-space(text())="확인"]'
 # --- Coupon Redemption Locators ---
 COUPON_CODE_INPUT = '//*[@id="site-widget-1885701553012187"]//input[@placeholder="선물 코드 입력"]'
 REDEEM_BUTTON_INITIAL = '//*[@id="site-widget-1885701553012187"]//button[contains(@class, "site-button") and normalize-space(text())="교환하기"]'
-REDEEM_BUTTON_CONFIRM = '//div[contains(@class, "dialog-btn confirm")]//button[normalize-space(text())="교환하기"]'
-CANCEL_BUTTON = '//div[contains(@class, "dialog-btn cancel")]//button[span[text()="취소"]]'
+REDEEM_BUTTON_CONFIRM = "//div[contains(@class, 'dialog-actions')]//button[contains(@class, 'confirm')]"
+CANCEL_BUTTON = "//div[contains(@class, 'dialog-actions')]//button[contains(@class, 'cancel')]"
 
 # --- Feedback Message Locators ---
 # These messages appear dynamically after attempting to redeem a coupon.

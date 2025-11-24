@@ -174,7 +174,7 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
             log_func(f"Attempt {attempt + 1}/{max_retries} for {coupon}")
 
             # Try to clear any pop-ups before starting
-            click_element_js(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Pre-emptive Cancel", timeout=3)
+            click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Pre-emptive Cancel", timeout=3, retries=1)
             
             coupon_input = wait_and_find_element(driver, By.XPATH, config.COUPON_CODE_INPUT)
             if not coupon_input:
@@ -224,7 +224,7 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                 result_logged = True
                 # Click cancel on "Already Used" to dismiss the dialog
                 if "이미 사용" in error_text:
-                    click_element_js(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Cancel on 'Already Used'", timeout=5)
+                    click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Cancel on 'Already Used'", timeout=5, retries=1)
                 break
             else:
                 log_func(f"WARNING: No known message for '{coupon}' on attempt {attempt + 1}.", level=logging.WARNING)
