@@ -11,7 +11,10 @@ from selenium.webdriver.support import expected_conditions as EC
 import config
 
 def get_used_coupons(base_filename):
-    """Reads the log file for a given base filename and returns a set of used coupon codes."""
+    """
+    Reads the log file for a given base filename and returns a set of used coupon codes.
+    Coupons marked as 'Failed' are excluded so they can be retried.
+    """
     used_coupons = set()
     log_file_path = os.path.join("coupon_logs", f"{base_filename}.txt")
     if not os.path.exists(log_file_path):
@@ -20,9 +23,20 @@ def get_used_coupons(base_filename):
     try:
         with open(log_file_path, 'r', encoding='utf-8') as f:
             for line in f:
-                coupon_code = line.strip().split('#')[0].strip()
-                if coupon_code:
-                    used_coupons.add(coupon_code)
+                if '#' in line:
+                    parts = line.strip().split('#', 1)
+                    coupon_code = parts[0].strip()
+                    result = parts[1].strip()
+                    # If the coupon failed, don't add it to the used set, so it can be retried.
+                    if coupon_code and "Failed" not in result:
+                        used_coupons.add(coupon_code)
+                else:
+                    # Handle lines without a '#', maybe older format or corrupted log
+                    coupon_code = line.strip()
+                    if coupon_code:
+                        # If we don't know the status, assume it's used to be safe
+                        used_coupons.add(coupon_code)
+
     except Exception as e:
         print(f"[ERROR] Could not read coupon log for {base_filename}: {e}")
         
@@ -199,6 +213,13 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
             error_element_post = wait_and_find_element(driver, By.XPATH, config.ERROR_MESSAGE_P, timeout=3)
             if error_element_post:
                 error_text = error_element_post.text.strip()
+                
+                # Handle rate limiting message
+                if "작업이 너무 자주 발생합니다" in error_text:
+                    log_func(f"Rate limit message received for {coupon}. Waiting 30 seconds to retry.", level=logging.WARNING)
+                    time.sleep(30)
+                    continue # Retry the same coupon
+
                 log_coupon_result(base_filename, coupon, error_text, log_func)
                 result_logged = True
                 # Click cancel on "Already Used" to dismiss the dialog
