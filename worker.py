@@ -301,25 +301,28 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         time.sleep(5)
         take_screenshot(driver, base_filename)
 
-        # Click the 7 buttons before redeeming coupons
-        log("Attempting to click 10 promotional buttons.")
-        for i in range(1, 11):
-            button_xpath = f'//*[@id="site-widget-1035124126946440"]/div[4]/div/div[3]/div[{i}]/div[5]/div[3]'
-            if click_element(driver, By.XPATH, button_xpath, log, f"Promo Button {i}", timeout=5):
-                time.sleep(1)
-                x_button_xpath = '//*[@id="site-widget-1035124126946440"]/div[5]/div/div[2]/div/i'
-                x_button = wait_and_find_element(driver, By.XPATH, x_button_xpath, timeout=2, visible=False)
-                if x_button:
-                    log("Found 'X' button, attempting to close pop-up.")
-                    click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button", timeout=3)
+        # Conditional click of promotional buttons based on environment variable
+        if os.getenv('ENABLE_PROMOTIONAL_BUTTONS') == 'Y':
+            log("ENABLE_PROMOTIONAL_BUTTONS is 'Y'. Attempting to click 10 promotional buttons.")
+            for i in range(1, 11):
+                button_xpath = f'//*[@id="site-widget-1035124126946440"]/div[4]/div/div[3]/div[{i}]/div[5]/div[3]'
+                if click_element(driver, By.XPATH, button_xpath, log, f"Promo Button {i}", timeout=5):
                     time.sleep(1)
+                    x_button_xpath = '//*[@id="site-widget-1035124126946440"]/div[5]/div/div[2]/div/i'
+                    x_button = wait_and_find_element(driver, By.XPATH, x_button_xpath, timeout=2, visible=False)
+                    if x_button:
+                        log("Found 'X' button, attempting to close pop-up.")
+                        click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button", timeout=3)
+                        time.sleep(1)
+                    else:
+                        log(f"No 'X' button found after clicking Promo Button {i}.")
                 else:
-                    log(f"No 'X' button found after clicking Promo Button {i}.")
-            else:
-                log(f"Could not click Promo Button {i}, moving to the next.")
-        
-        log("Finished clicking promotional buttons.")
-        take_screenshot(driver, base_filename)
+                    log(f"Could not click Promo Button {i}, moving to the next.")
+            
+            log("Finished clicking promotional buttons.")
+            take_screenshot(driver, base_filename)
+        else:
+            log("ENABLE_PROMOTIONAL_BUTTONS is not 'Y'. Skipping promotional buttons.")
 
         redeem_coupons(driver, log, base_filename, coupons_to_try)
 
