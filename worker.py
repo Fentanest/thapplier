@@ -323,22 +323,39 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         take_screenshot(driver, base_filename)
 
         # Conditional click of promotional buttons based on environment variable
-        if os.getenv('ENABLE_PROMOTIONAL_BUTTONS') == 'Y':
-            log("ENABLE_PROMOTIONAL_BUTTONS is 'Y'. Attempting to click 10 promotional buttons.")
+        if config.ENABLE_PROMOTIONAL_BUTTONS == 'Y':
+            log("ENABLE_PROMOTIONAL_BUTTONS is 'Y'. Attempting to click promotional buttons.")
             for i in range(1, 11):
+                log(f"Attempting to click promotional button #{i}")
+
+                # Try original path first
                 button_xpath = f'//*[@id="site-widget-1035124126946440"]/div[4]/div/div[3]/div[{i}]/div[5]/div[3]'
-                if click_element(driver, By.XPATH, button_xpath, log, f"Promo Button {i}", timeout=5):
+                clicked = click_element(driver, By.XPATH, button_xpath, log, f"Promo Button {i} (by original XPath)", timeout=5, retries=1)
+
+                if not clicked:
+                    log(f"Promo button {i} not found with original XPath. Trying fallback.", level=logging.INFO)
+                    promotion_button_text = config.PROMOTION_BUTTON_TEXT
+                    fallback_button_xpath = f"(//div[contains(@class, 'handle')]//span[contains(text(), '{promotion_button_text}')])[1]"
+                    clicked = click_element(driver, By.XPATH, fallback_button_xpath, log, f"Promo Button (fallback by text '{promotion_button_text}')", timeout=5, retries=1)
+
+                if clicked:
                     time.sleep(1)
+                    # Now, the X button logic
                     x_button_xpath = '//*[@id="site-widget-1035124126946440"]/div[5]/div/div[2]/div/i'
-                    x_button = wait_and_find_element(driver, By.XPATH, x_button_xpath, timeout=2, visible=False)
-                    if x_button:
-                        log("Found 'X' button, attempting to close pop-up.")
-                        click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button", timeout=3)
+                    closed = click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button (by original XPath)", timeout=3)
+                    
+                    if not closed:
+                        log("'X' button not found with original XPath. Trying fallback.", level=logging.INFO)
+                        close_button_class = config.CLOSE_BUTTON_CLASS
+                        close_button_selector = '.' + '.'.join(close_button_class.split())
+                        closed = click_element_js(driver, By.CSS_SELECTOR, close_button_selector, log, f"'X' button (fallback by class '{close_button_class}')", timeout=3)
+
+                    if closed:
                         time.sleep(1)
                     else:
-                        log(f"No 'X' button found after clicking Promo Button {i}.")
+                        log(f"No 'X' button found after clicking promo button.")
                 else:
-                    log(f"Could not click Promo Button {i}, moving to the next.")
+                    log(f"Could not click any promotional button for attempt #{i}. Moving to the next.")
             
             log("Finished clicking promotional buttons.")
             take_screenshot(driver, base_filename)
