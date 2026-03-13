@@ -285,9 +285,11 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                         ]
                         
                         if any(phrase in msg_text for phrase in rate_limit_messages):
-                            log_func(f"RATE LIMIT / LIMIT REACHED: {msg_text}. Stopping session.")
-                            log_coupon_result(base_filename, coupon, f"Limit/Rate: {msg_text}", log_func)
-                            return 
+                            log_func(f"RATE LIMIT DETECTED: {msg_text}. Pausing session for 660 seconds before retrying...")
+                            # Removed log_coupon_result for Paused state as per user request
+                            time.sleep(660)
+                            log_func("Wait over. Retrying current coupon...")
+                            continue # Retry the same attempt loop for this coupon
 
                         log_coupon_result(base_filename, coupon, msg_text, log_func)
                     else:
@@ -368,12 +370,8 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         status_dict['status'] = 'Preparing'
     
     used_coupons = get_used_coupons(base_filename)
-    if force_run:
-        coupons_to_try = all_coupons
-        log(f"Force Run enabled. Trying all {len(coupons_to_try)} coupons.")
-    else:
-        coupons_to_try = [c for c in all_coupons if c not in used_coupons]
-        log(f"Found {len(used_coupons)} used coupons. Will try {len(coupons_to_try)} new coupons.")
+    coupons_to_try = [c for c in all_coupons if c not in used_coupons]
+    log(f"Found {len(used_coupons)} used coupons. Will try {len(coupons_to_try)} new coupons.")
 
     if not coupons_to_try and not force_run:
         log("No new coupons to try. Skipping session start as Force Run is not enabled.")
