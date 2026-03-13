@@ -530,7 +530,9 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                             break
 
                     if closed:
+                        log("Popup closed successfully. Assuming no more bonuses to claim. Moving to coupons.")
                         time.sleep(1)
+                        break # Exit the for i in range(1, 11) loop
                     else:
                         log(f"No 'X' button found after clicking promo button.")
                 else:
