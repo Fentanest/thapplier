@@ -278,18 +278,31 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                 if is_error:
                     # Handle Error Case
                     if msg_text:
+                        # 1. 'Already Used' / 'Personal Limit' (As provided by user)
+                        already_used_messages = [
+                            "이미 사용",
+                            "Personal redemption limit reached for this CDKey",
+                            "이 CDKey의 개인 교환 횟수 제한에 도달했습니다",
+                            "Data does not exist"
+                        ]
+                        
+                        if any(phrase in msg_text for phrase in already_used_messages):
+                            log_func(f"Coupon already used or invalid: {msg_text}")
+                            log_coupon_result(base_filename, coupon, msg_text, log_func)
+                            result_logged = True
+                            break 
+
+                        # 2. 'Rate Limit' (As provided by user)
                         rate_limit_messages = [
                             "빈번한 작업", "빈번한", "frequent", "too many", "too frequent", "다시 시도", 
-                            "later", "작업이 너무 자주", "횟수가 초과되었습니다", "operation is too frequent",
-                            "횟수 제한", "limit", "reached"
+                            "later", "작업이 너무 자주", "횟수가 초과되었습니다", "operation is too frequent"
                         ]
                         
                         if any(phrase in msg_text for phrase in rate_limit_messages):
                             log_func(f"RATE LIMIT DETECTED: {msg_text}. Pausing session for 660 seconds before retrying...")
-                            # Removed log_coupon_result for Paused state as per user request
                             time.sleep(660)
                             log_func("Wait over. Retrying current coupon...")
-                            continue # Retry the same attempt loop for this coupon
+                            continue 
 
                         log_coupon_result(base_filename, coupon, msg_text, log_func)
                     else:
