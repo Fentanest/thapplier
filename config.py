@@ -62,4 +62,4 @@ SUCCESS_MESSAGE = '//*[@id="im-app"]//p[@class="el-message__content" and text()=
 # --- Promotion Settings ---
 ENABLE_PROMOTIONAL_BUTTONS = os.getenv("ENABLE_PROMOTIONAL_BUTTONS", "N") # Default to "N" (No)
 PROMOTION_BUTTON_TEXT = os.getenv("PROMOTION_BUTTON_TEXT", "로그인") # Default to "로그인"
-CLOSE_BUTTON_CLASS = os.getenv("CLOSE_BUTTON_CLASS", "el-icon-close sign-info__close") # Default to "el-icon-close sign-info__close"
+CLOSE_BUTTON_CLASS = os.getenv("CLOSE_BUTTON_CLASS", "el-icon-close close-btn") # Default to "el-icon-close sign-info__close"

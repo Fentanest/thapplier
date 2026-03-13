@@ -214,10 +214,19 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
             if error_element_post:
                 error_text = error_element_post.text.strip()
                 
-                # Handle rate limiting message
-                if "작업이 너무 자주 발생합니다" in error_text:
-                    log_func(f"Rate limit message received for {coupon}. Waiting 30 seconds to retry.", level=logging.WARNING)
-                    time.sleep(30)
+                # Handle rate limiting messages (10 minutes wait)
+                rate_limit_messages = [
+                    "빈번한 작업이 감지되었습니다",
+                    "Frequent operations detected",
+                    "Too many failed attempts",
+                    "잘못된 입력 횟수가 초과되었습니다",
+                    "The operation is too frequent",
+                    "작업이 너무 자주 발생합니다"
+                ]
+                
+                if any(msg in error_text for msg in rate_limit_messages):
+                    log_func(f"Rate limit reached: '{error_text}'. Waiting 10 minutes to retry.", level=logging.WARNING)
+                    time.sleep(660) # Wait for 10 minutes
                     continue # Retry the same coupon
 
                 log_coupon_result(base_filename, coupon, error_text, log_func)
@@ -333,10 +342,16 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                 clicked = click_element(driver, By.XPATH, button_xpath, log, f"Promo Button {i} (by original XPath)", timeout=2, retries=1)
 
                 if not clicked:
-                    log(f"Promo button {i} not found with original XPath. Trying fallback.", level=logging.INFO)
+                    log(f"Promo button {i} not found with original XPath. Trying fallback with environment variable text.", level=logging.INFO)
                     promotion_button_text = config.PROMOTION_BUTTON_TEXT
                     fallback_button_xpath = f"(//div[contains(@class, 'handle')]//span[contains(text(), '{promotion_button_text}')])[1]"
                     clicked = click_element(driver, By.XPATH, fallback_button_xpath, log, f"Promo Button (fallback by text '{promotion_button_text}')", timeout=2, retries=1)
+
+                # Final fallback to "로그인" if the environment variable text was different and also failed
+                if not clicked and config.PROMOTION_BUTTON_TEXT != "로그인":
+                    log(f"Promo button {i} still not found. Trying hardcoded fallback '로그인'.", level=logging.INFO)
+                    hardcoded_fallback_xpath = "(//div[contains(@class, 'handle')]//span[contains(text(), '로그인')])[1]"
+                    clicked = click_element(driver, By.XPATH, hardcoded_fallback_xpath, log, "Promo Button (hardcoded fallback by text '로그인')", timeout=2, retries=1)
 
                 if clicked:
                     time.sleep(1)
