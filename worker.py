@@ -145,7 +145,7 @@ def click_element(driver, by, value, log_func, description, timeout=10, retries=
 
 def click_element_js(driver, by, value, log_func, description, timeout=10):
     """Waits for an element and clicks it using JavaScript."""
-    element = wait_and_find_element(driver, by, value, timeout, visible=False)
+    element = wait_and_find_element(driver, by, value, timeout, visible=True)
     if element:
         try:
             driver.execute_script("arguments[0].click();", element)
@@ -154,7 +154,7 @@ def click_element_js(driver, by, value, log_func, description, timeout=10):
         except Exception as e:
             log_func(f"ERROR: JS click failed for '{description}'. Reason: {e}", level=logging.ERROR)
             return False
-    log_func(f"ERROR: '{description}' not found for JS click.", level=logging.ERROR)
+    log_func(f"ERROR: '{description}' not found or not visible for JS click.", level=logging.ERROR)
     return False
 
 def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
@@ -229,11 +229,21 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                     time.sleep(660) # Wait for 10 minutes
                     continue # Retry the same coupon
 
+                # Handle already used or personal limit reached messages
+                already_used_messages = [
+                    "이미 사용",
+                    "Personal redemption limit reached for this CDKey",
+                    "이 CDKey의 개인 교환 횟수 제한에 도달했습니다"
+                ]
+                
+                if any(msg in error_text for msg in already_used_messages):
+                    log_coupon_result(base_filename, coupon, "Already Used (or Limit Reached)", log_func)
+                    click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Cancel on 'Already Used/Limit'", timeout=5, retries=1)
+                    result_logged = True
+                    break
+
                 log_coupon_result(base_filename, coupon, error_text, log_func)
                 result_logged = True
-                # Click cancel on "Already Used" to dismiss the dialog
-                if "이미 사용" in error_text:
-                    click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Cancel on 'Already Used'", timeout=5, retries=1)
                 break
             else:
                 log_func(f"WARNING: No known message for '{coupon}' on attempt {attempt + 1}.", level=logging.WARNING)
@@ -354,16 +364,21 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                     clicked = click_element(driver, By.XPATH, hardcoded_fallback_xpath, log, "Promo Button (hardcoded fallback by text '로그인')", timeout=2, retries=1)
 
                 if clicked:
-                    time.sleep(1)
+                    time.sleep(2)
                     # Now, the X button logic
-                    x_button_xpath = '//*[@id="site-widget-1035124126946440"]/div[4]/div/div[2]/div/i'
-                    closed = click_element_js(driver, By.XPATH, x_button_xpath, log, "'X' button (by original XPath)", timeout=2)
+                    # 1. Try the button element first (most reliable in Element UI)
+                    x_button_selectors = [
+                        (By.CSS_SELECTOR, 'button.el-dialog__headerbtn'),
+                        (By.XPATH, '//*[@id="site-widget-1035124126946440"]/div[4]/div/div[2]/div/i'),
+                        (By.CSS_SELECTOR, '.el-icon-close.close-btn'),
+                        (By.XPATH, "//button[@aria-label='Close']")
+                    ]
                     
-                    if not closed:
-                        log("'X' button not found with original XPath. Trying fallback.", level=logging.INFO)
-                        close_button_class = config.CLOSE_BUTTON_CLASS
-                        close_button_selector = '.' + '.'.join(close_button_class.split())
-                        closed = click_element_js(driver, By.CSS_SELECTOR, close_button_selector, log, f"'X' button (fallback by class '{close_button_class}')", timeout=2)
+                    closed = False
+                    for by, selector in x_button_selectors:
+                        closed = click_element(driver, by, selector, log, f"'X' button ({selector})", timeout=2, retries=1)
+                        if closed:
+                            break
 
                     if closed:
                         time.sleep(1)
