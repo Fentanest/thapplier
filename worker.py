@@ -192,11 +192,12 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
 
             # Check for immediate "Invalid Code" error
             error_element_pre = wait_and_find_element(driver, By.XPATH, config.ERROR_MESSAGE_P, timeout=2)
-            if error_element_pre and "Data does not exist" in error_element_pre.text:
-                error_text = error_element_pre.text.strip()
-                log_coupon_result(base_filename, coupon, error_text, log_func)
-                result_logged = True
-                break 
+            if error_element_pre:
+                error_text_pre = error_element_pre.text.strip() or error_element_pre.get_attribute("innerText").strip()
+                if "Data does not exist" in error_text_pre or "잘못된" in error_text_pre:
+                    log_coupon_result(base_filename, coupon, error_text_pre, log_func)
+                    result_logged = True
+                    break 
 
             time.sleep(2) # Wait for confirmation dialog
 
@@ -212,19 +213,17 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
             
             error_element_post = wait_and_find_element(driver, By.XPATH, config.ERROR_MESSAGE_P, timeout=3)
             if error_element_post:
-                error_text = error_element_post.text.strip()
+                # Use .text and innerText as a fallback for more reliable detection
+                error_text = error_element_post.text.strip() or error_element_post.get_attribute("innerText").strip()
                 
                 # Handle rate limiting messages (10 minutes wait)
+                # We use a broader list of keywords and case-insensitive check
                 rate_limit_messages = [
-                    "빈번한 작업이 감지되었습니다",
-                    "Frequent operations detected",
-                    "Too many failed attempts",
-                    "잘못된 입력 횟수가 초과되었습니다",
-                    "The operation is too frequent",
-                    "작업이 너무 자주 발생합니다"
+                    "빈번한 작업", "빈번한", "frequent", "too many", "too frequent", "다시 시도", 
+                    "later", "작업이 너무 자주", "횟수가 초과되었습니다", "operation is too frequent"
                 ]
                 
-                if any(msg in error_text for msg in rate_limit_messages):
+                if any(msg.lower() in error_text.lower() for msg in rate_limit_messages):
                     log_func(f"Rate limit reached: '{error_text}'. Waiting 10 minutes to retry.", level=logging.WARNING)
                     time.sleep(660) # Wait for 10 minutes
                     continue # Retry the same coupon
@@ -236,7 +235,7 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                     "이 CDKey의 개인 교환 횟수 제한에 도달했습니다"
                 ]
                 
-                if any(msg in error_text for msg in already_used_messages):
+                if any(msg.lower() in error_text.lower() for msg in already_used_messages):
                     log_coupon_result(base_filename, coupon, "Already Used (or Limit Reached)", log_func)
                     click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Cancel on 'Already Used/Limit'", timeout=5, retries=1)
                     result_logged = True

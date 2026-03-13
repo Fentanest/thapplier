@@ -56,8 +56,9 @@ CANCEL_BUTTON = "//div[contains(@class, 'dialog-actions')]//button[contains(@cla
 
 # --- Feedback Message Locators ---
 # These messages appear dynamically after attempting to redeem a coupon.
-ERROR_MESSAGE_P = '//*[@id="im-app"]//div[contains(@class, "el-message--error") and @role="alert"]'
-SUCCESS_MESSAGE = '//*[@id="im-app"]//p[@class="el-message__content" and text()="Success"]'
+# Using more generic XPaths to handle structural changes and ensure detection.
+ERROR_MESSAGE_P = '//div[contains(@class, "el-message--error") and @role="alert"] | //div[contains(@class, "el-message--error")]'
+SUCCESS_MESSAGE = '//div[contains(@class, "el-message--success")] | //p[contains(@class, "el-message__content") and contains(text(), "Success")]'
 
 # --- Promotion Settings ---
 ENABLE_PROMOTIONAL_BUTTONS = os.getenv("ENABLE_PROMOTIONAL_BUTTONS", "N") # Default to "N" (No)
