@@ -228,16 +228,29 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                 log_func(f"Failed to click initial redeem for {coupon}. Retrying.", level=logging.WARNING)
                 continue
 
-            # Check for immediate "Invalid Code" error
-            error_element_pre = wait_and_find_element(driver, By.XPATH, config.ERROR_MESSAGE_P, timeout=2)
-            if error_element_pre:
-                error_text_pre = error_element_pre.text.strip() or error_element_pre.get_attribute("innerText").strip()
-                if "Data does not exist" in error_text_pre or "잘못된" in error_text_pre:
-                    log_coupon_result(base_filename, coupon, error_text_pre, log_func)
-                    result_logged = True
-                    break 
+            # NEW: Fast polling to catch transient error messages
+            error_element_pre = None
+            try:
+                # Poll every 0.5s for 3 seconds to catch fleeting messages
+                fast_wait = WebDriverWait(driver, 3, poll_frequency=0.5)
+                error_element_pre = fast_wait.until(EC.presence_of_element_located((By.XPATH, config.ERROR_MESSAGE_P)))
+            except TimeoutException:
+                pass
 
-            time.sleep(2) # Wait for confirmation dialog
+            if error_element_pre:
+                # Get text immediately before it disappears from DOM
+                try:
+                    error_text_pre = error_element_pre.text.strip() or error_element_pre.get_attribute("innerText").strip()
+                    if error_text_pre:
+                        if "Data does not exist" in error_text_pre or "잘못된" in error_text_pre:
+                            log_coupon_result(base_filename, coupon, error_text_pre, log_func)
+                            result_logged = True
+                            break 
+                except StaleElementReferenceException:
+                    # Message disappeared while reading, but we found it was there
+                    log_func("Detected error message, but it disappeared too quickly. Retrying...", level=logging.WARNING)
+
+            time.sleep(1.5) # Reduced wait for confirmation dialog since we polled for 3s
 
             if not click_element_js(driver, By.XPATH, config.REDEEM_BUTTON_CONFIRM, log_func, "Confirm Redeem"):
                 log_func(f"Failed to click confirm for {coupon}. Retrying.", level=logging.WARNING)
