@@ -365,17 +365,33 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                 if clicked:
                     time.sleep(2)
                     # Now, the X button logic
-                    # 1. Try the button element first (most reliable in Element UI)
+                    # 1. Try several selectors based on common Element UI patterns and user-provided HTML
+                    
+                    # Construct a CSS selector from config.CLOSE_BUTTON_CLASS (e.g., "class1 class2" -> ".class1.class2")
+                    config_x_selector = "." + config.CLOSE_BUTTON_CLASS.replace(" ", ".")
+                    
                     x_button_selectors = [
-                        (By.CSS_SELECTOR, 'button.el-dialog__headerbtn'),
-                        (By.XPATH, '//*[@id="site-widget-1035124126946440"]/div[4]/div/div[2]/div/i'),
-                        (By.CSS_SELECTOR, '.el-icon-close.close-btn'),
-                        (By.XPATH, "//button[@aria-label='Close']")
+                        (By.CSS_SELECTOR, 'button.el-dialog__headerbtn'), # Standard Element UI button
+                        (By.CSS_SELECTOR, config_x_selector),             # From config (el-icon-close.close-btn)
+                        (By.CSS_SELECTOR, '.el-dialog__headerbtn i'),     # Icon inside the button
+                        (By.XPATH, "//button[@aria-label='Close']"),      # Aria-label fallback
+                        (By.XPATH, '//*[@id="site-widget-1035124126946440"]//i[contains(@class, "close")]') # Specific container fallback
                     ]
                     
                     closed = False
                     for by, selector in x_button_selectors:
+                        # Try normal click first
                         closed = click_element(driver, by, selector, log, f"'X' button ({selector})", timeout=2, retries=1)
+                        if not closed:
+                            # If normal click fails, try JS click even if not perfectly "visible" (presence only)
+                            element = wait_and_find_element(driver, by, selector, timeout=1, visible=False)
+                            if element:
+                                try:
+                                    driver.execute_script("arguments[0].click();", element)
+                                    log(f"Clicked '{selector}' using emergency JS fallback (presence-only).")
+                                    closed = True
+                                except:
+                                    pass
                         if closed:
                             break
 
