@@ -211,46 +211,99 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
         for attempt in range(max_retries):
             log_func(f"Attempt {attempt + 1}/{max_retries} for {coupon}")
 
-            # Try to clear any pop-ups before starting
-            click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Pre-emptive Cancel", timeout=3, retries=1)
+            # # Try to clear any pop-ups before starting
+            # click_element(driver, By.XPATH, config.CANCEL_BUTTON, log_func, "Pre-emptive Cancel", timeout=3, retries=1)
+            
+            # if not click_element(driver, By.XPATH, config.COUPON_CODE_INPUT, log_func, "Coupon input"):
+            #     log_func("ERROR: Coupon input click failed.")
             
             coupon_input = wait_and_find_element(driver, By.XPATH, config.COUPON_CODE_INPUT)
             if not coupon_input:
-                log_func("ERROR: Coupon input not found. Retrying...", level=logging.ERROR)
+                log_func("ERROR: Coupon input field not found after click. Retrying...", level=logging.ERROR)
                 driver.refresh()
                 time.sleep(3)
                 continue
             
             coupon_input.clear()
             coupon_input.send_keys(coupon)
+            log_func(f"Entered coupon code: {coupon}")
             
-            if not click_element(driver, By.XPATH, config.REDEEM_BUTTON_INITIAL, log_func, "Initial Redeem"):
-                log_func(f"Failed to click initial redeem for {coupon}. Retrying.", level=logging.WARNING)
+            # 1. Try Standard Click
+            log_func(f"DEBUG: Starting Initial Redeem click for {coupon}")
+            clicked = click_element(driver, By.XPATH, config.REDEEM_BUTTON_INITIAL, log_func, "Initial Redeem (Standard)", timeout=5, retries=1)
+            
+            # 2. Try Mouse Actions Fallback
+            if not clicked:
+                log_func("DEBUG: Standard click failed. Attempting Mouse Actions.")
+                clicked = click_element_actions(driver, By.XPATH, config.REDEEM_BUTTON_INITIAL, log_func, "Initial Redeem (Mouse)", timeout=5)
+            
+            # 3. Try JS Fallback
+            if not clicked:
+                log_func("DEBUG: Mouse actions failed. Attempting JS click.")
+                clicked = click_element_js(driver, By.XPATH, config.REDEEM_BUTTON_INITIAL, log_func, "Initial Redeem (JS)", timeout=5)
+
+            if not clicked:
+                log_func(f"ERROR: Could not click Initial Redeem button for {coupon}.", level=logging.ERROR)
                 continue
 
-            # NEW: Fast polling to catch transient error messages
-            error_element_pre = None
+            # --- Start Message Polling immediately after successful click ---
+            log_func(f"DEBUG: Click successful! Now waiting for response message for {coupon}...")
+            msg_element = None
+            is_error = False
             try:
-                # Poll every 0.5s for 3 seconds to catch fleeting messages
+                # Look for both error and success styles
+                combined_xpath = f"{config.ERROR_MESSAGE_P} | {config.SUCCESS_MESSAGE}"
+                # Poll every 0.5s
                 fast_wait = WebDriverWait(driver, 3, poll_frequency=0.5)
-                error_element_pre = fast_wait.until(EC.presence_of_element_located((By.XPATH, config.ERROR_MESSAGE_P)))
+                msg_element = fast_wait.until(EC.presence_of_element_located((By.XPATH, combined_xpath)))
+                
+                # Determine if it's an error based on the parent div's class
+                parent_div = msg_element.find_element(By.XPATH, "./..")
+                is_error = "el-message--error" in parent_div.get_attribute("class")
+                log_func(f"Message detected! Type: {'Error' if is_error else 'Success'}")
             except TimeoutException:
+                log_func("No response message appeared within 3s.")
                 pass
+            except Exception as e:
+                log_func(f"Note: Exception while polling: {str(e)[:50]}")
 
-            if error_element_pre:
-                # Get text immediately before it disappears from DOM
+            if msg_element:
+                msg_text = ""
                 try:
-                    error_text_pre = error_element_pre.text.strip() or error_element_pre.get_attribute("innerText").strip()
-                    if error_text_pre:
-                        if "Data does not exist" in error_text_pre or "잘못된" in error_text_pre:
-                            log_coupon_result(base_filename, coupon, error_text_pre, log_func)
-                            result_logged = True
-                            break 
+                    msg_text = msg_element.get_attribute("textContent").strip() or msg_element.text.strip()
+                    log_func(f"Detected Message: '{msg_text}'")
                 except StaleElementReferenceException:
-                    # Message disappeared while reading, but we found it was there
-                    log_func("Detected error message, but it disappeared too quickly. Retrying...", level=logging.WARNING)
+                    log_func("Message disappeared too quickly to read text.")
 
-            time.sleep(1.5) # Reduced wait for confirmation dialog since we polled for 3s
+                if is_error:
+                    # Handle Error Case
+                    if msg_text:
+                        rate_limit_messages = [
+                            "빈번한 작업", "빈번한", "frequent", "too many", "too frequent", "다시 시도", 
+                            "later", "작업이 너무 자주", "횟수가 초과되었습니다", "operation is too frequent",
+                            "횟수 제한", "limit", "reached"
+                        ]
+                        
+                        if any(phrase in msg_text for phrase in rate_limit_messages):
+                            log_func(f"RATE LIMIT / LIMIT REACHED: {msg_text}. Stopping session.")
+                            log_coupon_result(base_filename, coupon, f"Limit/Rate: {msg_text}", log_func)
+                            return 
+
+                        log_coupon_result(base_filename, coupon, msg_text, log_func)
+                    else:
+                        log_coupon_result(base_filename, coupon, "Unknown Error (Fleeting)", log_func)
+                    
+                    result_logged = True
+                    break 
+                else:
+                    # Handle Success Case
+                    log_func(f"Success confirmed: {msg_text or 'Success'}")
+                    log_coupon_result(base_filename, coupon, "Success", log_func)
+                    result_logged = True
+                    break
+
+            # If no message was detected, wait a moment and proceed to confirmation dialog
+            time.sleep(1) 
 
             if not click_element_js(driver, By.XPATH, config.REDEEM_BUTTON_CONFIRM, log_func, "Confirm Redeem"):
                 log_func(f"Failed to click confirm for {coupon}. Retrying.", level=logging.WARNING)
@@ -315,8 +368,12 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         status_dict['status'] = 'Preparing'
     
     used_coupons = get_used_coupons(base_filename)
-    coupons_to_try = [c for c in all_coupons if c not in used_coupons]
-    log(f"Found {len(used_coupons)} used coupons. Will try {len(coupons_to_try)} new coupons.")
+    if force_run:
+        coupons_to_try = all_coupons
+        log(f"Force Run enabled. Trying all {len(coupons_to_try)} coupons.")
+    else:
+        coupons_to_try = [c for c in all_coupons if c not in used_coupons]
+        log(f"Found {len(used_coupons)} used coupons. Will try {len(coupons_to_try)} new coupons.")
 
     if not coupons_to_try and not force_run:
         log("No new coupons to try. Skipping session start as Force Run is not enabled.")

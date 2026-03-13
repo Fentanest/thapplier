@@ -49,16 +49,16 @@ UID_CHECK_BUTTON = '//*[@id="__layout"]//i[@class="el-icon-check"]'
 CONFIRM_BUTTON = '//*[@id="__layout"]//button[normalize-space(text())="확인"]'
 
 # --- Coupon Redemption Locators ---
-COUPON_CODE_INPUT = '//*[@id="site-widget-1885701553012187"]//input[@placeholder="선물 코드 입력"]'
-REDEEM_BUTTON_INITIAL = '//*[@id="site-widget-1885701553012187"]//button[contains(@class, "site-button") and normalize-space(text())="교환하기"]'
+COUPON_CODE_INPUT = "//input[@placeholder='선물 코드 입력']"
+REDEEM_BUTTON_INITIAL = "//button[contains(@class, 'site-button') and contains(@class, 'submit-btn') and contains(., '교환하기')]"
 REDEEM_BUTTON_CONFIRM = "//div[contains(@class, 'dialog-actions')]//button[contains(@class, 'confirm')]"
 CANCEL_BUTTON = "//div[contains(@class, 'dialog-actions')]//button[contains(@class, 'cancel')]"
 
 # --- Feedback Message Locators ---
 # These messages appear dynamically after attempting to redeem a coupon.
-# Using more generic XPaths to handle structural changes and ensure detection.
-ERROR_MESSAGE_P = '//div[contains(@class, "el-message--error") and @role="alert"] | //div[contains(@class, "el-message--error")]'
-SUCCESS_MESSAGE = '//div[contains(@class, "el-message--success")] | //p[contains(@class, "el-message__content") and contains(text(), "Success")]'
+# Using more precise XPaths for Element UI alerts.
+ERROR_MESSAGE_P = "//div[@role='alert' and contains(@class, 'el-message--error')]//p[@class='el-message__content']"
+SUCCESS_MESSAGE = "//div[@role='alert' and contains(@class, 'el-message--success')]//p[@class='el-message__content']"
 
 # --- Promotion Settings ---
 ENABLE_PROMOTIONAL_BUTTONS = os.getenv("ENABLE_PROMOTIONAL_BUTTONS", "N") # Default to "N" (No)
