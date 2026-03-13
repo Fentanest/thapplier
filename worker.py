@@ -298,7 +298,8 @@ def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
                             "later", "작업이 너무 자주", "횟수가 초과되었습니다", "operation is too frequent"
                         ]
                         
-                        if any(phrase in msg_text for phrase in rate_limit_messages):
+                        # Use lower() for case-insensitive matching
+                        if any(phrase.lower() in msg_text.lower() for phrase in rate_limit_messages):
                             log_func(f"RATE LIMIT DETECTED: {msg_text}. Pausing session for 660 seconds before retrying...")
                             time.sleep(660)
                             log_func("Wait over. Retrying current coupon...")
