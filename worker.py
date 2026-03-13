@@ -5,6 +5,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
+from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
@@ -157,6 +158,43 @@ def click_element_js(driver, by, value, log_func, description, timeout=10):
     log_func(f"ERROR: '{description}' not found or not visible for JS click.", level=logging.ERROR)
     return False
 
+def click_element_actions(driver, by, value, log_func, description, timeout=10):
+    """Waits for an element to be present, scrolls it into view, and clicks it using ActionChains."""
+    # Use presence instead of visibility to be more flexible
+    element = wait_and_find_element(driver, by, value, timeout, visible=False)
+    if element:
+        try:
+            # Force scroll into view using JS first to ensure it's in the viewport
+            driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+            time.sleep(0.5)
+            
+            actions = ActionChains(driver)
+            # Move to element and click
+            actions.move_to_element(element).click().perform()
+            log_func(f"Clicked '{description}' using Mouse Actions.")
+            return True
+        except Exception as e:
+            error_msg = str(e)
+            if "has no size and location" in error_msg or "not interactable" in error_msg:
+                log_func(f"'{description}' element has no size/location. Calculating coordinates for forced click...", level=logging.INFO)
+            else:
+                log_func(f"Mouse click failed for '{description}'. Trying fallback. Error: {error_msg[:50]}...", level=logging.WARNING)
+            
+            try:
+                # Emergency fallback: move to element location and click
+                location = element.location_once_scrolled_into_view
+                actions = ActionChains(driver)
+                # Adding a small offset to hit the center or at least avoid the very edge
+                actions.move_by_offset(location['x'] + 2, location['y'] + 2).click().perform()
+                # Reset offset for next actions
+                actions.move_by_offset(-(location['x'] + 2), -(location['y'] + 2)).perform()
+                log_func(f"Clicked '{description}' using Mouse Offset Actions.")
+                return True
+            except Exception as inner_e:
+                log_func(f"Offset click failed: {str(inner_e)[:50]}", level=logging.ERROR)
+                return False
+    return False
+
 def redeem_coupons(driver, log_func, base_filename, coupons_to_try):
     """Iterates through coupons and attempts to redeem them."""
     if not coupons_to_try:
@@ -302,13 +340,13 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         log(f"Navigated to {config.BASE_URL}")
         take_screenshot(driver, base_filename)
 
-        # Banner can sometimes be slow to appear
-        time.sleep(3)
-        click_element(driver, By.XPATH, config.BANNER_CLOSE_BUTTON, log, "Banner close", timeout=5)
-        take_screenshot(driver, base_filename)
-
         if not click_element(driver, By.XPATH, config.LOGIN_BUTTON, log, "Login button"):
-            raise Exception("Failed to find or click Login button.")
+            # If login button not found, maybe a banner is blocking it. Try one refresh as a fallback.
+            log("Login button not found. Refreshing once as fallback.")
+            driver.refresh()
+            time.sleep(3)
+            if not click_element(driver, By.XPATH, config.LOGIN_BUTTON, log, "Login button"):
+                raise Exception("Failed to find or click Login button.")
         
         time.sleep(1)
         take_screenshot(driver, base_filename)
@@ -340,6 +378,17 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
         time.sleep(5)
         take_screenshot(driver, base_filename)
 
+        # Check for the Gold Blocks walkthrough banner (Swiper-based)
+        gold_blocks_banner_xpath = "//div[contains(@class, 'swiper-wrapper') and contains(@class, 'slide-block')] | //*[contains(text(), 'Gold Blocks work')]"
+        if wait_and_find_element(driver, By.XPATH, gold_blocks_banner_xpath, timeout=3, visible=True):
+            log("Detected 'Gold Blocks' walkthrough banner. Refreshing page to clear it.")
+            driver.refresh()
+            time.sleep(5)
+            log("Page refreshed after login.")
+            take_screenshot(driver, base_filename)
+        else:
+            log("No walkthrough banner detected. Continuing.")
+
         # Conditional click of promotional buttons based on environment variable
         if config.ENABLE_PROMOTIONAL_BUTTONS == 'Y':
             log("ENABLE_PROMOTIONAL_BUTTONS is 'Y'. Attempting to click promotional buttons.")
@@ -362,34 +411,49 @@ def process_uid(uid, comment, all_coupons, status_dict, lock, force_run=False):
                     hardcoded_fallback_xpath = "(//div[contains(@class, 'handle')]//span[contains(text(), '로그인')])[1]"
                     clicked = click_element(driver, By.XPATH, hardcoded_fallback_xpath, log, "Promo Button (hardcoded fallback by text '로그인')", timeout=2, retries=1)
 
+                # NEW: Try Mouse Actions if everything else failed
+                if not clicked:
+                    log(f"Standard clicks failed for Promo Button {i}. Trying Mouse Actions fallback.", level=logging.INFO)
+                    promotion_button_text = config.PROMOTION_BUTTON_TEXT
+                    fallback_button_xpath = f"(//div[contains(@class, 'handle')]//span[contains(text(), '{promotion_button_text}')])[1]"
+                    clicked = click_element_actions(driver, By.XPATH, fallback_button_xpath, log, f"Promo Button {i} (Mouse Actions)", timeout=2)
+
                 if clicked:
                     time.sleep(2)
                     # Now, the X button logic
-                    # 1. Try several selectors based on common Element UI patterns and user-provided HTML
-                    
-                    # Construct a CSS selector from config.CLOSE_BUTTON_CLASS (e.g., "class1 class2" -> ".class1.class2")
                     config_x_selector = "." + config.CLOSE_BUTTON_CLASS.replace(" ", ".")
                     
                     x_button_selectors = [
                         (By.CSS_SELECTOR, 'button.el-dialog__headerbtn'), # Standard Element UI button
-                        (By.CSS_SELECTOR, config_x_selector),             # From config (el-icon-close.close-btn)
-                        (By.CSS_SELECTOR, '.el-dialog__headerbtn i'),     # Icon inside the button
+                        (By.CSS_SELECTOR, config_x_selector),             # From config
                         (By.XPATH, "//button[@aria-label='Close']"),      # Aria-label fallback
-                        (By.XPATH, '//*[@id="site-widget-1035124126946440"]//i[contains(@class, "close")]') # Specific container fallback
+                        (By.XPATH, '//*[@id="site-widget-1035124126946440"]//i[contains(@class, "close")]') # Container fallback
                     ]
                     
                     closed = False
                     for by, selector in x_button_selectors:
-                        # Try normal click first
-                        closed = click_element(driver, by, selector, log, f"'X' button ({selector})", timeout=2, retries=1)
+                        log(f"Trying to close popup with selector: {selector}")
+                        
+                        # 1. Try Mouse Actions FIRST (more reliable for some UI)
+                        closed = click_element_actions(driver, by, selector, log, f"'X' button ({selector}) (Mouse)")
+                        
+                        # 2. Try Standard Click if Mouse failed
                         if not closed:
-                            # If normal click fails, try JS click even if not perfectly "visible" (presence only)
+                            closed = click_element(driver, by, selector, log, f"'X' button ({selector}) (Standard)", timeout=2, retries=1)
+                        
+                        # 3. Try JS click as ABSOLUTE LAST fallback (often says success but does nothing)
+                        if not closed:
                             element = wait_and_find_element(driver, by, selector, timeout=1, visible=False)
                             if element:
                                 try:
                                     driver.execute_script("arguments[0].click();", element)
-                                    log(f"Clicked '{selector}' using emergency JS fallback (presence-only).")
-                                    closed = True
+                                    log(f"Clicked '{selector}' using emergency JS fallback.")
+                                    # We don't set closed=True immediately because JS often lies. 
+                                    # Let's check if element is still there.
+                                    time.sleep(1)
+                                    if not wait_and_find_element(driver, by, selector, timeout=1, visible=True):
+                                        log(f"Popup seems closed after JS click.")
+                                        closed = True
                                 except:
                                     pass
                         if closed:
